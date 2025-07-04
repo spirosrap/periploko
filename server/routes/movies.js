@@ -32,14 +32,22 @@ async function findAllVideoFiles(dir) {
 // Get all movies
 router.get('/', async (req, res) => {
   try {
-    const mediaDir = path.join(__dirname, '..', 'media');
+    // Load media folders from config
+    const configPath = path.join(__dirname, '../config.json');
+    const config = await fs.readJson(configPath);
+    const mediaFolders = config.mediaFolders || ['media'];
     const movies = [];
 
-    if (await fs.pathExists(mediaDir)) {
-      const videoFiles = await findAllVideoFiles(mediaDir);
-      for (const { file, filePath } of videoFiles) {
-        const movieInfo = await getMovieInfo(file, filePath);
-        movies.push(movieInfo);
+    for (const folder of mediaFolders) {
+      const absFolder = path.isAbsolute(folder)
+        ? folder
+        : path.join(__dirname, '..', folder);
+      if (await fs.pathExists(absFolder)) {
+        const videoFiles = await findAllVideoFiles(absFolder);
+        for (const { file, filePath } of videoFiles) {
+          const movieInfo = await getMovieInfo(file, filePath);
+          movies.push(movieInfo);
+        }
       }
     }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import { 
@@ -19,6 +19,9 @@ const LibraryManagement: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const queryClient = useQueryClient();
+  const [folders, setFolders] = useState<string[]>([]);
+  const [newFolder, setNewFolder] = useState('');
+  const [foldersLoading, setFoldersLoading] = useState(false);
 
   // Fetch library stats
   const { data: stats, isLoading: statsLoading } = useQuery(
@@ -73,6 +76,45 @@ const LibraryManagement: React.FC = () => {
       }
     }
   );
+
+  // Fetch library folders
+  const fetchFolders = async () => {
+    setFoldersLoading(true);
+    try {
+      const res = await axios.get('/api/library/folders');
+      setFolders(res.data.data);
+    } catch (e) {
+      toast.error('Failed to fetch folders');
+    } finally {
+      setFoldersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFolders();
+  }, []);
+
+  const handleAddFolder = async () => {
+    if (!newFolder.trim()) return;
+    try {
+      await axios.post('/api/library/folders', { path: newFolder.trim() });
+      setNewFolder('');
+      fetchFolders();
+      toast.success('Folder added!');
+    } catch (e) {
+      toast.error('Failed to add folder');
+    }
+  };
+
+  const handleRemoveFolder = async (folder: string) => {
+    try {
+      await axios.delete('/api/library/folders', { data: { path: folder } });
+      fetchFolders();
+      toast.success('Folder removed!');
+    } catch (e) {
+      toast.error('Failed to remove folder');
+    }
+  };
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,6 +226,64 @@ const LibraryManagement: React.FC = () => {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Library Folders Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gray-800 rounded-lg p-6"
+        >
+          <div className="flex items-center mb-6">
+            <FolderOpen className="w-6 h-6 text-yellow-400 mr-3" />
+            <h2 className="text-xl font-semibold text-white">Library Folders</h2>
+          </div>
+          {foldersLoading ? (
+            <div className="flex items-center justify-center h-24">
+              <div className="loading-spinner"></div>
+            </div>
+          ) : (
+            <div>
+              <ul className="mb-4">
+                {folders.map(folder => (
+                  <li key={folder} className="flex items-center justify-between bg-gray-700 rounded px-3 py-2 mb-2">
+                    <span className="text-white font-mono">{folder}</span>
+                    {folder !== 'media' && (
+                      <button
+                        onClick={() => handleRemoveFolder(folder)}
+                        className="ml-4 text-red-400 hover:text-red-600"
+                        title="Remove folder"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={newFolder}
+                  onChange={e => setNewFolder(e.target.value)}
+                  placeholder="Add folder (relative or absolute path)"
+                  className="flex-1 px-3 py-2 rounded bg-gray-900 text-white border border-gray-600 focus:outline-none"
+                />
+                <button
+                  onClick={handleAddFolder}
+                  className="btn-primary flex items-center"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </button>
+              </div>
+              <button
+                onClick={fetchFolders}
+                className="btn-secondary mt-4 flex items-center"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Refresh Folders
+              </button>
             </div>
           )}
         </motion.div>

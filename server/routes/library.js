@@ -140,6 +140,56 @@ router.post('/upload', upload.single('movie'), async (req, res) => {
   }
 });
 
+// Get media folders
+router.get('/folders', async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '../config.json');
+    const config = await fs.readJson(configPath);
+    res.json({ success: true, data: config.mediaFolders });
+  } catch (error) {
+    console.error('Error reading config:', error);
+    res.status(500).json({ success: false, error: 'Failed to read config' });
+  }
+});
+
+// Add a media folder
+router.post('/folders', async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '../config.json');
+    const { path: folderPath } = req.body;
+    if (!folderPath || typeof folderPath !== 'string') {
+      return res.status(400).json({ success: false, error: 'Path is required' });
+    }
+    const config = await fs.readJson(configPath);
+    if (!config.mediaFolders.includes(folderPath)) {
+      config.mediaFolders.push(folderPath);
+      await fs.writeJson(configPath, config, { spaces: 2 });
+    }
+    res.json({ success: true, data: config.mediaFolders });
+  } catch (error) {
+    console.error('Error updating config:', error);
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+// Remove a media folder
+router.delete('/folders', async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '../config.json');
+    const { path: folderPath } = req.body;
+    if (!folderPath || typeof folderPath !== 'string') {
+      return res.status(400).json({ success: false, error: 'Path is required' });
+    }
+    const config = await fs.readJson(configPath);
+    config.mediaFolders = config.mediaFolders.filter(p => p !== folderPath);
+    await fs.writeJson(configPath, config, { spaces: 2 });
+    res.json({ success: true, data: config.mediaFolders });
+  } catch (error) {
+    console.error('Error updating config:', error);
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
 // Delete movie file
 router.delete('/:filename', async (req, res) => {
   try {
