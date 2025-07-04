@@ -76,7 +76,11 @@ const MoviePlayer: React.FC = () => {
     );
   }
 
-  const videoUrl = `/api/stream?path=${encodeURIComponent(movie.path)}`;
+  // Determine if we need to transcode (for x265/hevc)
+  const needsTranscode = movie.codec && ["hevc", "x265"].includes(movie.codec.toLowerCase());
+  const videoUrl = needsTranscode
+    ? `/api/stream/transcode/${encodeURIComponent(movie.path)}?quality=720p`
+    : `/api/stream?path=${encodeURIComponent(movie.path)}`;
   const subtitleUrl = movie.subtitle ? `/api/stream/subtitle?path=${encodeURIComponent(movie.subtitle)}` : null;
 
   const handlePlayPause = () => {
@@ -213,6 +217,11 @@ const MoviePlayer: React.FC = () => {
       )}
       {/* Video Player */}
       <div className={`relative w-full h-screen ${uiHidden ? '' : ''}`}>
+        {needsTranscode && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-600 text-white px-4 py-1 rounded shadow text-sm font-semibold">
+            Transcoding...
+          </div>
+        )}
         <video
           ref={playerRef}
           src={videoUrl}

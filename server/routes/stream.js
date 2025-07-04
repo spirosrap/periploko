@@ -92,7 +92,13 @@ router.get('/transcode/:filename', async (req, res) => {
       .videoBitrate(settings.bitrate)
       .audioBitrate('128k')
       .fps(24)
+      .outputOptions('-pix_fmt yuv420p')
+      .outputOptions('-movflags +faststart+frag_keyframe+empty_moov')
+      .outputOptions('-profile:v main')
       .format('mp4')
+      .on('stderr', (line) => {
+        console.error('FFmpeg stderr:', line);
+      })
       .on('error', (err) => {
         console.error('Transcoding error:', err);
         res.end();
