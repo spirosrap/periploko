@@ -10,6 +10,23 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 // Video file extensions
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'];
 
+// Simple in-memory cache for movie metadata
+const movieCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Clean up expired cache entries
+function cleanupCache() {
+  const now = Date.now();
+  for (const [key, value] of movieCache.entries()) {
+    if (now - value.timestamp > CACHE_DURATION) {
+      movieCache.delete(key);
+    }
+  }
+}
+
+// Run cleanup every minute
+setInterval(cleanupCache, 60 * 1000);
+
 // Helper to recursively find all video files in a directory
 async function findAllVideoFiles(dir) {
   let results = [];
@@ -29,9 +46,13 @@ async function findAllVideoFiles(dir) {
   return results;
 }
 
-// Get all movies
+// Get all movies with pagination
 router.get('/', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    
     // Load media folders from config
     const configPath = path.join(__dirname, '../config.json');
     const config = await fs.readJson(configPath);
@@ -51,10 +72,24 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // Sort movies by title for consistent pagination
+    movies.sort((a, b) => a.title.localeCompare(b.title));
+
+    // Apply pagination
+    const paginatedMovies = movies.slice(skip, skip + limit);
+    const totalPages = Math.ceil(movies.length / limit);
+
     res.json({
       success: true,
-      data: movies,
-      count: movies.length
+      data: paginatedMovies,
+      pagination: {
+        page,
+        limit,
+        total: movies.length,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
     });
   } catch (error) {
     console.error('Error fetching movies:', error);
@@ -126,6 +161,35 @@ router.get('/search/:query', async (req, res) => {
   }
 });
 
+// Get movie count only (for performance)
+router.get('/count', async (req, res) => {
+  try {
+    // Load media folders from config
+    const configPath = path.join(__dirname, '../config.json');
+    const config = await fs.readJson(configPath);
+    const mediaFolders = config.mediaFolders || ['media'];
+    let totalCount = 0;
+
+    for (const folder of mediaFolders) {
+      const absFolder = path.isAbsolute(folder)
+        ? folder
+        : path.join(__dirname, '..', folder);
+      if (await fs.pathExists(absFolder)) {
+        const videoFiles = await findAllVideoFiles(absFolder);
+        totalCount += videoFiles.length;
+      }
+    }
+
+    res.json({
+      success: true,
+      count: totalCount
+    });
+  } catch (error) {
+    console.error('Error fetching movie count:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch movie count' });
+  }
+});
+
 // Helper to fetch TMDb metadata
 async function fetchTMDbMetadata(title, year) {
   if (!TMDB_API_KEY) return null;
@@ -167,6 +231,14 @@ function extractTitleYear(filename) {
 // Helper function to get movie information
 async function getMovieInfo(filename, filePath) {
   const stat = await fs.stat(filePath);
+  const cacheKey = `${filePath}-${stat.mtime.getTime()}`;
+  
+  // Check cache first
+  const cached = movieCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    return cached.data;
+  }
+
   const parsed = path.parse(filename);
   const { title, year } = extractTitleYear(filename);
   const dir = path.dirname(filePath);
@@ -214,6 +286,13 @@ async function getMovieInfo(filename, filePath) {
       }
       // Fetch TMDb metadata
       movieInfo.tmdb = await fetchTMDbMetadata(title, year);
+      
+      // Cache the result
+      movieCache.set(cacheKey, {
+        data: movieInfo,
+        timestamp: Date.now()
+      });
+      
       resolve(movieInfo);
     });
   });
