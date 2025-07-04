@@ -2,3 +2,5 @@ node_modules
 server/media/
 .DS_Store
 server/hls-cache/
+.env
+server/.env
