@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useQuery } from 'react-query';
 import { motion } from 'framer-motion';
 import { Search, Play, Clock, HardDrive, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -12,6 +12,7 @@ const MovieLibrary: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [moviesPerPage] = useState(20);
+  const gridRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch movies from API with pagination
   const { data: moviesData, isLoading, error } = useQuery(
@@ -61,9 +62,14 @@ const MovieLibrary: React.FC = () => {
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    // Scroll to top when changing pages
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Scroll to grid when page or moviesData changes
+  useEffect(() => {
+    if (gridRef.current && moviesData?.success) {
+      gridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage, moviesData]);
 
   const totalMovies = countData?.success ? countData.count : 0;
   const totalPages = Math.ceil(totalMovies / moviesPerPage);
@@ -133,6 +139,7 @@ const MovieLibrary: React.FC = () => {
           )}
           
           <motion.div
+            ref={gridRef}
             variants={containerVariants}
             initial="hidden"
             animate="visible"
