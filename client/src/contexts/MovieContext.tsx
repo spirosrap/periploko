@@ -13,6 +13,18 @@ export interface Movie {
   durationFormatted?: string;
   resolution?: string;
   codec?: string;
+  tmdb?: {
+    tmdb_id: number;
+    title: string;
+    overview: string;
+    poster: string | null;
+    backdrop: string | null;
+    release_date: string;
+    year: string | null;
+    vote_average: number;
+    genres: number[];
+  } | null;
+  subtitle?: string | null;
 }
 
 interface MovieState {

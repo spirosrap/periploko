@@ -11,6 +11,7 @@ const streamRoutes = require('./routes/stream');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // Middleware
 app.use(helmet());
